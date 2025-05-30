@@ -1,0 +1,30 @@
+body {
+  font-family: 'Poppins', sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+#particles-js {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(135deg, #111827 0%, #1F2937 100%);
+}
+
+.table-dark-custom {
+  background: #1F2937;
+  color: #D1D5DB;
+}
+
+.table-dark-custom thead {
+  background: #374151;
+}
+
+.table-dark-custom tr {
+  border-bottom: 1px solid #4B5563;
+}
+
+.table-dark-custom tr:hover {
+  background: #374151;
+}
