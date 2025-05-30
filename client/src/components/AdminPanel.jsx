@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Table, Pagination } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 
-function AdminPanel() {
+function AdminPanel({ onLogout }) {
   const [books, setBooks] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true); // Track initial load
   const [error, setError] = useState('');
   const [sortOrder, setSortOrder] = useState('asc');
+  const navigate = useNavigate();
 
   // Get the token from localStorage
   const token = localStorage.getItem('token');
 
   useEffect(() => {
+    // Load particles.js for background effect
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js';
     script.async = true;
@@ -73,12 +77,14 @@ function AdminPanel() {
   const fetchBooksWithRetry = async (retries = 3, delay = 2000) => {
     for (let i = 0; i < retries; i++) {
       try {
+        console.log(`Fetching books, attempt ${i + 1}...`);
         const response = await axios.get(
           `https://assignment-3-mxhg.onrender.com/api/books?page=${page}&limit=10`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
+            timeout: 10000,
           }
         );
         console.log('Fetch books response:', response.data);
@@ -95,6 +101,24 @@ function AdminPanel() {
         return;
       } catch (error) {
         console.error(`Fetch attempt ${i + 1} failed:`, error.response?.data || error.message);
+        if (error.response?.status === 401) {
+          setError('Session expired. Please log in again.');
+          if (onLogout) onLogout();
+          navigate('/login');
+          return;
+        }
+        if (error.response?.status === 404) {
+          setError('Books endpoint not found. Please check the backend API.');
+          return;
+        }
+        if (error.code === 'ECONNABORTED') {
+          setError('Request timed out. Please check your network connection.');
+          return;
+        }
+        if (error.message.includes('Network Error')) {
+          setError('Network error. Please check if the backend server is running.');
+          return;
+        }
         if (i === retries - 1) {
           setError(error.response?.data?.error || error.response?.data?.message || 'Error fetching books. Please try again later.');
         } else {
@@ -109,6 +133,7 @@ function AdminPanel() {
     setError('');
     await fetchBooksWithRetry();
     setLoading(false);
+    setInitialLoad(false); // Mark initial load as complete
   };
 
   const handleScrape = async () => {
@@ -122,6 +147,7 @@ function AdminPanel() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          timeout: 10000,
         }
       );
       console.log('Scrape response:', response.data);
@@ -129,9 +155,16 @@ function AdminPanel() {
       await fetchBooks();
     } catch (error) {
       console.error('Error scraping books:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        setError('Session expired. Please log in again.');
+        if (onLogout) onLogout();
+        navigate('/login');
+        return;
+      }
       setError(error.response?.data?.error || error.response?.data?.message || 'Failed to scrape books');
     }
     setLoading(false);
+    setInitialLoad(false);
   };
 
   const handleDeleteAll = async () => {
@@ -147,6 +180,7 @@ function AdminPanel() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          timeout: 10000,
         }
       );
       console.log('Delete response:', response.data);
@@ -154,21 +188,35 @@ function AdminPanel() {
       await fetchBooks();
     } catch (error) {
       console.error('Error deleting books:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        setError('Session expired. Please log in again.');
+        if (onLogout) onLogout();
+        navigate('/login');
+        return;
+      }
       setError(error.response?.data?.error || error.response?.data?.message || 'Failed to delete books');
     }
     setLoading(false);
+    setInitialLoad(false);
+  };
+
+  const handleSortByPrice = () => {
+    const newSortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+    setSortOrder(newSortOrder);
+    fetchBooks();
   };
 
   useEffect(() => {
     if (!token) {
       setError('No authentication token found. Please log in again.');
+      navigate('/login');
       return;
     }
     fetchBooks();
-  }, [page, sortOrder, token]);
+  }, [page, sortOrder, token, navigate]);
 
-  // Show a loading spinner while fetching data
-  if (loading && !error) {
+  // Show full-page loading spinner only on initial load
+  if (loading && initialLoad && !error) {
     return (
       <div
         style={{
@@ -424,6 +472,49 @@ function AdminPanel() {
                 </svg>
                 Delete All
               </button>
+              <button
+                onClick={() => {
+                  if (onLogout) onLogout();
+                  navigate('/login');
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.625rem',
+                  fontWeight: '600',
+                  color: 'white',
+                  background: '#6b7280',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#4b5563';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#6b7280';
+                }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-2 w-2"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+                Logout
+              </button>
             </div>
           </div>
 
@@ -460,7 +551,48 @@ function AdminPanel() {
             </div>
           )}
 
-          <div style={{ overflowX: 'auto', borderRadius: '0.5rem', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ overflowX: 'auto', borderRadius: '0.5rem', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)', position: 'relative' }}>
+            {loading && !initialLoad && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  zIndex: 10,
+                  borderRadius: '0.5rem',
+                }}
+              >
+                <div style={{ textAlign: 'center', color: '#1e3a8a' }}>
+                  <svg
+                    className="animate-spin h-6 w-6 mx-auto mb-2"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8H4z"
+                    ></path>
+                  </svg>
+                  <p style={{ fontSize: '0.875rem' }}>Loading books...</p>
+                </div>
+              </div>
+            )}
             <Table
               style={{
                 background: 'white',
