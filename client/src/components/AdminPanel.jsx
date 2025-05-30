@@ -10,6 +10,9 @@ function AdminPanel() {
   const [error, setError] = useState('');
   const [sortOrder, setSortOrder] = useState('asc');
 
+  // Get the token from localStorage
+  const token = localStorage.getItem('token');
+
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js';
@@ -70,21 +73,30 @@ function AdminPanel() {
   const fetchBooksWithRetry = async (retries = 3, delay = 2000) => {
     for (let i = 0; i < retries; i++) {
       try {
-        const response = await axios.get(`http://localhost:5000/api/books?page=${page}&limit=10`);
+        const response = await axios.get(
+          `https://assignment-3-mxhg.onrender.com/api/books?page=${page}&limit=10`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
         console.log('Fetch books response:', response.data);
-        let fetchedBooks = response.data.books || [];
-        fetchedBooks = [...fetchedBooks].sort((a, b) => {
-          const priceA = parseFloat(a.price.replace('£', '')) || 0;
-          const priceB = parseFloat(b.price.replace('£', '')) || 0;
+
+        // Ensure response.data.books is an array
+        const fetchedBooks = Array.isArray(response.data.books) ? response.data.books : [];
+        fetchedBooks.sort((a, b) => {
+          const priceA = parseFloat(a.price?.replace('£', '') || 0);
+          const priceB = parseFloat(b.price?.replace('£', '') || 0);
           return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
         });
         setBooks(fetchedBooks);
-        setTotalPages(response.data.totalPages || 1);
+        setTotalPages(Number.isInteger(response.data.totalPages) ? response.data.totalPages : 1);
         return;
       } catch (error) {
         console.error(`Fetch attempt ${i + 1} failed:`, error.response?.data || error.message);
         if (i === retries - 1) {
-          setError(error.response?.data?.error || error.response?.data?.message || 'Error fetching books');
+          setError(error.response?.data?.error || error.response?.data?.message || 'Error fetching books. Please try again later.');
         } else {
           await new Promise(resolve => setTimeout(resolve, delay));
         }
@@ -103,7 +115,15 @@ function AdminPanel() {
     setLoading(true);
     setError('');
     try {
-      const response = await axios.post('http://localhost:5000/api/books/scrape');
+      const response = await axios.post(
+        'https://assignment-3-mxhg.onrender.com/api/books/scrape',
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       console.log('Scrape response:', response.data);
       setPage(1);
       await fetchBooks();
@@ -114,12 +134,6 @@ function AdminPanel() {
     setLoading(false);
   };
 
-  const handleSortByPrice = () => {
-    const newSortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-    setSortOrder(newSortOrder);
-    fetchBooks();
-  };
-
   const handleDeleteAll = async () => {
     if (!confirm('Are you sure you want to delete all books? This action cannot be undone.')) {
       return;
@@ -127,7 +141,14 @@ function AdminPanel() {
     setLoading(true);
     setError('');
     try {
-      const response = await axios.delete('http://localhost:5000/api/books');
+      const response = await axios.delete(
+        'https://assignment-3-mxhg.onrender.com/api/books',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       console.log('Delete response:', response.data);
       setPage(1);
       await fetchBooks();
@@ -139,8 +160,52 @@ function AdminPanel() {
   };
 
   useEffect(() => {
+    if (!token) {
+      setError('No authentication token found. Please log in again.');
+      return;
+    }
     fetchBooks();
-  }, [page, sortOrder]);
+  }, [page, sortOrder, token]);
+
+  // Show a loading spinner while fetching data
+  if (loading && !error) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)',
+          fontFamily: "'Inter', sans-serif",
+        }}
+      >
+        <div style={{ textAlign: 'center', color: 'white' }}>
+          <svg
+            className="animate-spin h-8 w-8 mx-auto mb-2"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v8H4z"
+            ></path>
+          </svg>
+          <p>Loading books...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -452,8 +517,8 @@ function AdminPanel() {
                         e.currentTarget.style.background = index % 2 === 0 ? '#f9fafb' : 'white';
                       }}
                     >
-                      <td style={{ padding: '1rem', fontWeight: '500' }}>{book.title}</td>
-                      <td style={{ padding: '1rem', color: '#16a34a' }}>{book.price}</td>
+                      <td style={{ padding: '1rem', fontWeight: '500' }}>{book.title || 'N/A'}</td>
+                      <td style={{ padding: '1rem', color: '#16a34a' }}>{book.price || 'N/A'}</td>
                       <td style={{ padding: '1rem' }}>
                         <span
                           style={{
@@ -476,7 +541,7 @@ function AdminPanel() {
                           >
                             <path d="M12 .587l3.668 7.431 8.332 1.209-6.001 5.858 1.416 8.265L12 18.896l-7.415 3.897 1.416-8.265-6.001-5.858 8.332-1.209L12 .587z" />
                           </svg>
-                          {book.rating}
+                          {book.rating || 'N/A'}
                         </span>
                       </td>
                     </tr>

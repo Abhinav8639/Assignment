@@ -79,11 +79,13 @@ function Login({ setIsAuthenticated }) {
     setLoading(true);
     setError('');
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const response = await axios.post('https://assignment-3-mxhg.onrender.com/api/auth/login', {
         username,
         password,
       });
       if (response.data.token) {
+        // Store the token in localStorage
+        localStorage.setItem('token', response.data.token);
         setIsAuthenticated(true);
         navigate('/admin');
       }
@@ -93,12 +95,6 @@ function Login({ setIsAuthenticated }) {
       setLoading(false);
     }
   };
-
-  console.log('Rendering Login component...');
-  console.log('Username state:', username);
-  console.log('Password state:', password);
-  console.log('Error state:', error);
-  console.log('Loading state:', loading);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '3rem 1rem', position: 'relative' }}>
